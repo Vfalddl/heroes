@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Золотые Звёзды Северян - герои Севера на основе книги Р.А. Овсянкина">
+  <meta name="theme-color" content="#0a0e17">
+  <!-- PWA мета-теги -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <title>Золотые Звёзды Северян</title>
+  <!-- MapLibre GL CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.0/dist/maplibre-gl.css" />
+  <!-- Иконки -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Локальные стили -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Инициализация Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(registration => console.log('Service Worker зарегистрирован:', registration.scope))
+          .catch(error => console.log('Ошибка регистрации Service Worker:', error));
+      });
+    }
+    
+    // Загрузка темы из localStorage
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    });
+  </script>
+</head>
+<body>
+  <!-- Прелоадер -->
+  <div id="preloader">
+    <div class="loader">
+      <div class="stars-container">
+        <div class="star star-1"><i class="fas fa-star"></i></div>
+        <div class="star star-2"><i class="fas fa-star"></i></div>
+        <div class="star star-3"><i class="fas fa-star"></i></div>
+      </div>
+      <p class="loading-text" id="loading-text">Загрузка героического наследия...</p>
+      <div class="progress-bar">
+        <div class="progress" id="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Аудиогид в левом верхнем углу -->
+  <div class="audio-guide-container" id="audio-guide-main">
+    <div class="audio-guide-header">
+      <div class="audio-guide-title">
+        <i class="fas fa-headphones"></i>
+        <span>Аудиогид</span>
+        <div class="audio-status-indicator"></div>
+      </div>
+      <button id="audio-toggle" class="audio-btn" title="Включить/выключить автогид">
+        <i class="fas fa-volume-mute"></i>
+      </button>
+    </div>
+    
+    <div class="audio-controls">
+      <button id="audio-play" class="audio-btn" title="Рассказать о текущем разделе">
+        <i class="fas fa-play"></i>
+      </button>
+      <button id="audio-pause" class="audio-btn" title="Пауза">
+        <i class="fas fa-pause"></i>
+      </button>
+      <button id="audio-stop" class="audio-btn" title="Остановить">
+        <i class="fas fa-stop"></i>
+      </button>
+      <button id="audio-speed" class="audio-btn" title="Изменить скорость (1x)">
+        <i class="fas fa-tachometer-alt"></i>
+        <span class="speed-indicator">1x</span>
+      </button>
+    </div>
+    
+    <div class="audio-progress-container">
+      <div id="audio-progress" class="audio-progress"></div>
+    </div>
+    
+    <div class="audio-settings">
+      <div class="audio-speed">
+        <span>Скорость:</span>
+        <span class="speed-indicator">1x</span>
+      </div>
+      <div class="audio-voice">
+        <select id="audio-voice">
+          <option value="ru-RU">Русский (Россия)</option>
+          <option value="en-US">English (US)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Боковое меню -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mini">
+        <i class="fas fa-star gold-star"></i>
+        <span>ЗЗС</span>
+      </div>
+      <button class="sidebar-close" id="sidebar-close">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="sidebar-content">
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-link active" data-section="info">
+          <i class="fas fa-users"></i>
+          <span>Герои</span>
+          <div class="nav-indicator"></div>
+        </a>
+        <a href="#" class="sidebar-link" data-section="awards">
+          <i class="fas fa-medal"></i>
+          <span>Награды</span>
+          <div class="nav-indicator"></div>
+        </a>
+        <a href="#" class="sidebar-link" data-section="monuments">
+          <i class="fas fa-landmark"></i>
+          <span>Памятники</span>
+          <div class="nav-indicator"></div>
+        </a>
+        <a href="#" class="sidebar-link" data-section="events">
+          <i class="fas fa-history"></i>
+          <span>События</span>
+          <div class="nav-indicator"></div>
+        </a>
+        <a href="#" class="sidebar-link" data-section="quiz">
+          <i class="fas fa-question-circle"></i>
+          <span>Тест</span>
+          <div class="nav-indicator"></div>
+        </a>
+      </nav>
+      
+      <!-- Убрана секция аудиогида из меню -->
+      
+      <div class="sidebar-footer">
+        <div class="offline-toggle-container">
+          <button class="offline-toggle-btn" id="offline-toggle">
+            <i class="fas fa-wifi"></i>
+            <span>Оффлайн режим</span>
+            <div class="toggle-switch">
+              <div class="toggle-knob"></div>
+            </div>
+          </button>
+        </div>
+        <div class="connection-status" id="connection-status">
+          <i class="fas fa-circle"></i>
+          <span>Онлайн</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Основной контент -->
+  <main class="main-content">
+    <!-- Верхняя панель -->
+    <header class="top-bar">
+      <button class="menu-toggle" id="menu-toggle">
+        <div class="hamburger">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <span class="menu-text">Меню</span>
+      </button>
+      
+      <div class="header-main">
+        <div class="logo-header">
+          <div class="logo-icon">
+            <i class="fas fa-star"></i>
+            <div class="logo-glow"></div>
+          </div>
+          <div class="logo-text">
+            <h1>Золотые Звёзды Северян</h1>
+            <p class="logo-subtitle">Героическое наследие Севера</p>
+          </div>
+        </div>
+        
+        <div class="search-container">
+          <div class="search-box" id="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="search-input" placeholder="Поиск героев, подвигов, наград...">
+            <div class="search-actions">
+              <button id="clear-search" class="clear-btn" title="Очистить">
+                <i class="fas fa-times"></i>
+              </button>
+              <span class="search-hint">Enter для поиска</span>
+            </div>
+          </div>
+          <div class="search-stats">
+            <span class="stat-chip">
+              <i class="fas fa-users"></i>
+              <span id="hero-count">10</span> героев
+            </span>
+            <span class="stat-chip">
+              <i class="fas fa-map-marker-alt"></i>
+              <span id="location-count">20</span> локаций
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="user-actions">
+        <div class="action-btn" id="theme-toggle" title="Сменить тему">
+          <i class="fas fa-sun"></i>
+        </div>
+        <div class="action-btn" id="fullscreen-toggle" title="Полный экран">
+          <i class="fas fa-expand"></i>
+        </div>
+      </div>
+    </header>
+
+    <!-- Контент героев (по умолчанию активен) -->
+    <section id="info" class="content-section active">
+      <div class="section-header animated-header">
+        <div class="header-badge">
+          <i class="fas fa-users"></i>
+          <span>Выдающиеся личности</span>
+        </div>
+        <h2 class="section-title">Герои-северяне</h2>
+        <p class="section-description">Храбрость, отвага и самопожертвование во имя Родины</p>
+      </div>
+
+      <!-- Карта с анимированными элементами -->
+      <div class="map-section">
+        <div class="map-header">
+          <h3><i class="fas fa-globe-europe"></i> География подвигов</h3>
+          <div class="map-controls">
+            <button class="map-control-btn" id="map-style-toggle" title="Сменить стиль">
+              <i class="fas fa-layer-group"></i>
+            </button>
+            <button class="map-control-btn" id="map-3d-toggle" title="3D вид">
+              <i class="fas fa-cube"></i>
+            </button>
+            <button class="map-control-btn" id="map-reset" title="Сбросить вид">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+            <button class="map-control-btn" id="map-zoom-in" title="Приблизить">
+              <i class="fas fa-search-plus"></i>
+            </button>
+            <button class="map-control-btn" id="map-zoom-out" title="Отдалить">
+              <i class="fas fa-search-minus"></i>
+            </button>
+          </div>
+        </div>
+        <div class="map-container">
+          <div id="hero-map"></div>
+          <div class="map-overlay">
+            <div class="map-legend">
+              <div class="legend-title">Легенда карты</div>
+              <div class="legend-items">
+                <div class="legend-item">
+                  <div class="legend-marker birth-marker">
+                    <i class="fas fa-home"></i>
+                  </div>
+                  <span>Место рождения</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-marker deed-marker">
+                    <i class="fas fa-crosshairs"></i>
+                  </div>
+                  <span>Место подвига</span>
+                </div>
+              </div>
+            </div>
+            <div class="map-stats">
+              <div class="stat-card">
+                <i class="fas fa-map-pin"></i>
+                <div>
+                  <div class="stat-value" id="map-pins">20</div>
+                  <div class="stat-label">Точек на карте</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Сетка героев -->
+      <div class="heroes-grid-section">
+        <div class="section-toolbar">
+          <h3><i class="fas fa-star-of-life"></i> Все герои</h3>
+          <div class="view-controls">
+            <button class="view-btn active" data-view="grid">
+              <i class="fas fa-th"></i>
+            </button>
+            <button class="view-btn" data-view="list">
+              <i class="fas fa-list"></i>
+            </button>
+          </div>
+        </div>
+        <div class="hero-grid" id="heroes-list"></div>
+        <div class="empty-state" id="no-results" style="display: none;">
+          <i class="fas fa-search"></i>
+          <h4>Ничего не найдено</h4>
+          <p>Попробуйте изменить поисковый запрос</p>
+        </div>
+      </div>
+
+      <!-- Детали героя -->
+      <div class="hero-detail-overlay" id="hero-detail-overlay"></div>
+      <div class="hero-detail-panel" id="hero-detail">
+        <div class="detail-header">
+          <div class="detail-title">
+            <i class="fas fa-user-shield"></i>
+            <h2 id="detail-hero-name">Детали героя</h2>
+          </div>
+          <button class="close-detail" id="close-detail">
+            <i class="fas fa-times"></i>
+            <span class="tooltip">Закрыть</span>
+          </button>
+        </div>
+        <div class="detail-content" id="detail-content">
+          <div class="detail-placeholder">
+            <i class="fas fa-user-alt"></i>
+            <p>Выберите героя для просмотра детальной информации</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Секция наград -->
+    <section id="awards" class="content-section">
+      <div class="section-header animated-header">
+        <div class="header-badge">
+          <i class="fas fa-medal"></i>
+          <span>Наградная система</span>
+        </div>
+        <h2 class="section-title">Боевые награды</h2>
+        <p class="section-description">Ордена и медали Великой Отечественной войны, которыми награждались герои-северяне</p>
+      </div>
+
+      <div class="awards-container">
+        <div class="awards-filter">
+          <button class="filter-btn active" data-filter="all">Все награды</button>
+          <button class="filter-btn" data-filter="highest">Высшие</button>
+          <button class="filter-btn" data-filter="order">Ордена</button>
+          <button class="filter-btn" data-filter="medal">Медали</button>
+        </div>
+
+        <div class="awards-grid" id="awards-grid"></div>
+      </div>
+    </section>
+
+    <!-- Секция памятников -->
+    <section id="monuments" class="content-section">
+      <div class="section-header animated-header">
+        <div class="header-badge">
+          <i class="fas fa-landmark"></i>
+          <span>Мемориалы</span>
+        </div>
+        <h2 class="section-title">Памятники и мемориалы</h2>
+        <p class="section-description">Места памяти, посвящённые героям-северянам и их подвигам</p>
+      </div>
+
+      <div class="monuments-container">
+        <div class="monuments-map-container">
+          <div id="monuments-map" class="monuments-map"></div>
+          <div class="map-overlay monuments-overlay">
+            <div class="map-legend monuments-legend">
+              <div class="legend-title">Типы памятников</div>
+              <div class="legend-items">
+                <div class="legend-item">
+                  <div class="legend-marker monument-marker">
+                    <i class="fas fa-monument"></i>
+                  </div>
+                  <span>Памятник</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-marker museum-marker">
+                    <i class="fas fa-university"></i>
+                  </div>
+                  <span>Музей</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-marker memorial-marker">
+                    <i class="fas fa-cross"></i>
+                  </div>
+                  <span>Мемориал</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="monuments-list" id="monuments-list"></div>
+      </div>
+    </section>
+
+    <!-- Секция событий -->
+    <section id="events" class="content-section">
+      <div class="section-header animated-header">
+        <div class="header-badge">
+          <i class="fas fa-history"></i>
+          <span>Хронология</span>
+        </div>
+        <h2 class="section-title">Исторические события</h2>
+        <p class="section-description">Важные даты и сражения Великой Отечественной войны</p>
+      </div>
+
+      <div class="timeline-container">
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </section>
+
+    <!-- Секция теста -->
+    <section id="quiz" class="content-section">
+      <div class="section-header animated-header">
+        <div class="header-badge">
+          <i class="fas fa-question-circle"></i>
+          <span>Проверка знаний</span>
+        </div>
+        <h2 class="section-title">Тест на знание истории</h2>
+        <p class="section-description">Проверьте свои знания о героях-северянах и их подвигах</p>
+      </div>
+
+      <div class="quiz-container">
+        <div class="quiz-stats">
+          <div class="quiz-stat">
+            <i class="fas fa-trophy"></i>
+            <span>Сложность: <span id="quiz-difficulty">Средняя</span></span>
+          </div>
+          <div class="quiz-stat">
+            <i class="fas fa-clock"></i>
+            <span>Время: <span id="quiz-time">10 мин</span></span>
+          </div>
+          <div class="quiz-stat">
+            <i class="fas fa-question"></i>
+            <span>Вопросов: <span id="quiz-count">10</span></span>
+          </div>
+        </div>
+
+        <div class="quiz-content">
+          <div class="quiz-welcome" id="quiz-welcome">
+            <div class="quiz-icon">
+              <i class="fas fa-graduation-cap"></i>
+            </div>
+            <h3>Готовы проверить свои знания?</h3>
+            <p>Тест состоит из 10 вопросов о героях-северянах, их наградах и подвигах</p>
+            <div class="quiz-options">
+              <div class="quiz-option">
+                <input type="radio" id="easy" name="difficulty" value="easy" checked>
+                <label for="easy">Лёгкий (5 вопросов)</label>
+              </div>
+              <div class="quiz-option">
+                <input type="radio" id="medium" name="difficulty" value="medium">
+                <label for="medium">Средний (10 вопросов)</label>
+              </div>
+              <div class="quiz-option">
+                <input type="radio" id="hard" name="difficulty" value="hard">
+                <label for="hard">Сложный (15 вопросов)</label>
+              </div>
+            </div>
+            <button class="quiz-start-btn" id="quiz-start">Начать тест</button>
+          </div>
+
+          <div class="quiz-question" id="quiz-question" style="display: none;">
+            <div class="question-header">
+              <span class="question-number">Вопрос <span id="current-question">1</span>/<span id="total-questions">10</span></span>
+              <div class="quiz-timer">
+                <i class="fas fa-hourglass-half"></i>
+                <span id="quiz-timer">01:30</span>
+              </div>
+            </div>
+            <div class="question-text" id="question-text"></div>
+            <div class="question-options" id="question-options"></div>
+            <div class="quiz-navigation">
+              <button class="quiz-nav-btn" id="quiz-prev">Назад</button>
+              <button class="quiz-nav-btn" id="quiz-next">Далее</button>
+              <button class="quiz-nav-btn submit-btn" id="quiz-submit" style="display: none;">Завершить</button>
+            </div>
+          </div>
+
+          <div class="quiz-results" id="quiz-results" style="display: none;">
+            <div class="results-icon">
+              <i class="fas fa-award"></i>
+            </div>
+            <h3>Результаты теста</h3>
+            <div class="results-score">
+              <div class="score-circle">
+                <span id="quiz-score">0</span>%
+              </div>
+              <div class="score-details">
+                <p>Правильных ответов: <span id="correct-answers">0</span>/<span id="total-answers">10</span></p>
+                <p>Время: <span id="final-time">0:00</span></p>
+              </div>
+            </div>
+            <div class="results-message" id="results-message"></div>
+            <div class="results-actions">
+              <button class="results-btn" id="quiz-restart">Пройти ещё раз</button>
+              <button class="results-btn" id="quiz-review">Просмотреть ответы</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Футер -->
+    <footer class="main-footer">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <i class="fas fa-star"></i>
+            <span>ЗЗС</span>
+          </div>
+          <div class="footer-info">
+            <h3>Золотые Звёзды Северян</h3>
+            <p>Проект основан на книге Р.А. Овсянкина</p>
+            <p class="footer-copyright">© 2025 Все права защищены</p>
+          </div>
+        </div>
+        
+        <div class="footer-stats">
+          <div class="footer-stat">
+            <div class="stat-icon">
+              <i class="fas fa-user-shield"></i>
+              <div class="stat-pulse"></div>
+            </div>
+            <div class="stat-content">
+              <div class="stat-number" id="total-heroes">10</div>
+              <div class="stat-label">Героев</div>
+            </div>
+          </div>
+          <div class="footer-stat">
+            <div class="stat-icon">
+              <i class="fas fa-map-marked-alt"></i>
+              <div class="stat-pulse"></div>
+            </div>
+            <div class="stat-content">
+              <div class="stat-number" id="total-locations">20</div>
+              <div class="stat-label">Локаций</div>
+            </div>
+          </div>
+          <div class="footer-stat">
+            <div class="stat-icon">
+              <i class="fas fa-medal"></i>
+              <div class="stat-pulse"></div>
+            </div>
+            <div class="stat-content">
+              <div class="stat-number" id="total-awards">30</div>
+              <div class="stat-label">Наград</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="footer-links">
+          <a href="#" class="footer-link" data-audio="sources">
+            <i class="fas fa-book"></i>
+            <span>Источники</span>
+          </a>
+          <a href="#" class="footer-link" data-audio="about">
+            <i class="fas fa-info-circle"></i>
+            <span>О проекте</span>
+          </a>
+          <a href="#" class="footer-link" data-audio="contacts">
+            <i class="fas fa-envelope"></i>
+            <span>Контакты</span>
+          </a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Создано с <i class="fas fa-heart pulse"></i> для сохранения памяти о героях Севера</p>
+        <div class="tech-stack">
+          <span class="tech-tag">HTML5</span>
+          <span class="tech-tag">CSS3</span>
+          <span class="tech-tag">JavaScript</span>
+          <span class="tech-tag">MapLibre</span>
+          <span class="tech-tag">PWA</span>
+          <span class="tech-tag">Web Speech API</span>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Контейнер для уведомлений -->
+  <div class="notification-container" id="notification-container"></div>
+
+  <!-- Скрипты -->
+  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+  <script src="script.js"></script>
+  <script src="audio-guide.js"></script>
+</body>
+</html>
